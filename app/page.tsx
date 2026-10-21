@@ -46,7 +46,7 @@ export default function Home() {
   const runOpportunityRadar = useCallback(async () => {
     setLoadingAction('radar');
     setStatus('loading');
-    showResult('⏳ 正在从 GSC 拉取数据，请稍候...');
+    showResult('⏳ Fetching data from GSC, please wait...');
 
     try {
       const json = await callApi('/api/radar', {
@@ -60,12 +60,12 @@ export default function Home() {
         showResult(JSON.stringify(json.data, null, 2));
       } else {
         setStatus('error');
-        showResult(`❌ 错误: ${json.error}`);
+        showResult(`❌ Error: ${json.error}`);
       }
     } catch (err: unknown) {
       setStatus('error');
-      const message = err instanceof Error ? err.message : '未知错误';
-      showResult(`❌ 请求失败: ${message}`);
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      showResult(`❌ Request failed: ${message}`);
     } finally {
       setLoadingAction(null);
     }
@@ -74,7 +74,7 @@ export default function Home() {
   const runInspectUrl = useCallback(async () => {
     setLoadingAction('inspect');
     setStatus('loading');
-    showResult('⏳ 正在调用 URL Inspection API...');
+    showResult('⏳ Calling URL Inspection API...');
 
     try {
       const json = await callApi('/api/inspect', {
@@ -87,12 +87,12 @@ export default function Home() {
         showResult(JSON.stringify(json.data, null, 2));
       } else {
         setStatus('error');
-        showResult(`❌ 错误: ${json.error}`);
+        showResult(`❌ Error: ${json.error}`);
       }
     } catch (err: unknown) {
       setStatus('error');
-      const message = err instanceof Error ? err.message : '未知错误';
-      showResult(`❌ 请求失败: ${message}`);
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      showResult(`❌ Request failed: ${message}`);
     } finally {
       setLoadingAction(null);
     }
@@ -100,9 +100,9 @@ export default function Home() {
 
   const statusBadge = {
     idle: null,
-    loading: { text: '加载中', cls: 'bg-blue-900/40 text-blue-300 border-blue-700' },
-    success: { text: '成功', cls: 'bg-emerald-900/40 text-emerald-300 border-emerald-700' },
-    error: { text: '失败', cls: 'bg-red-900/40 text-red-300 border-red-700' },
+    loading: { text: 'Loading', cls: 'bg-blue-900/40 text-blue-300 border-blue-700' },
+    success: { text: 'Success', cls: 'bg-emerald-900/40 text-emerald-300 border-emerald-700' },
+    error: { text: 'Failed', cls: 'bg-red-900/40 text-red-300 border-red-700' },
   };
 
   return (
@@ -111,10 +111,10 @@ export default function Home() {
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-slate-50 tracking-tight">
-            GSC 工具测试台
+            GSC Diagnostic Tool
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            本地 Web UI — 直接调用 opportunity-radar 和 inspect-url 工具
+            Next.js Micro-SaaS - GSC API Integration
           </p>
         </div>
 
@@ -123,7 +123,7 @@ export default function Home() {
           {/* Site URL */}
           <div className="mb-4">
             <label className="block text-xs font-medium text-slate-400 mb-1.5 tracking-wide uppercase">
-              站点 URL
+              Site URL
             </label>
             <input
               type="url"
@@ -137,7 +137,7 @@ export default function Home() {
           {/* Inspection URL */}
           <div className="mb-4">
             <label className="block text-xs font-medium text-slate-400 mb-1.5 tracking-wide uppercase">
-              探测目标 URL <span className="text-slate-500 normal-case">(留空则与站点 URL 相同)</span>
+              Inspection URL <span className="text-slate-500 normal-case">(optional, defaults to Site URL)</span>
             </label>
             <input
               type="url"
@@ -152,7 +152,7 @@ export default function Home() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-1.5 tracking-wide uppercase">
-                最小曝光量
+                Min. Impressions
               </label>
               <input
                 type="number"
@@ -164,7 +164,7 @@ export default function Home() {
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-1.5 tracking-wide uppercase">
-                回溯天数
+                Days Back
               </label>
               <input
                 type="number"
@@ -187,7 +187,7 @@ export default function Home() {
               {loadingAction === 'radar' && (
                 <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin-slow" />
               )}
-              扫描机会词
+              Scan Opportunities
             </button>
             <button
               onClick={runInspectUrl}
@@ -197,7 +197,7 @@ export default function Home() {
               {loadingAction === 'inspect' && (
                 <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin-slow" />
               )}
-              探测收录
+              Inspect Index Status
             </button>
           </div>
         </div>
@@ -206,7 +206,7 @@ export default function Home() {
         <div className="bg-slate-800/60 backdrop-blur border border-slate-700/50 rounded-2xl overflow-hidden shadow-lg">
           {/* Result Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50">
-            <h2 className="text-sm font-semibold text-slate-200">结果</h2>
+            <h2 className="text-sm font-semibold text-slate-200">Results</h2>
             {status !== 'idle' && statusBadge[status] && (
               <span
                 className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${statusBadge[status].cls}`}
@@ -221,7 +221,7 @@ export default function Home() {
             {status === 'idle' ? (
               <div className="text-center text-slate-500 py-12">
                 <div className="text-4xl mb-3">🔍</div>
-                <p className="text-sm">点击上方按钮开始测试</p>
+                <p className="text-sm">Click the buttons above to start testing</p>
               </div>
             ) : (
               <pre

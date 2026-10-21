@@ -1,46 +1,46 @@
 /**
- * Tool: gsc_inspect_url（收录探测针）
+ * Tool: gsc_inspect_url
  *
- * 调用 Google URL Inspection API，实时探测特定 URL 的收录状态。
- * 返回 verdict、coverageState、indexingState、canonical 等关键字段。
+ * Calls the Google URL Inspection API to check the real-time index status of a specific URL.
+ * Returns key fields: verdict, coverageState, indexingState, canonical, etc.
  *
- * 注意：URL Inspection API 配额较严格（约 200 次/天），
- * 仅用于针对关键页面的定向探测，不适合批量扫描。
+ * Note: The URL Inspection API has strict quotas (~200 queries/day).
+ * Use it only for targeted inspection of key pages — not for bulk scanning.
  */
 
 const { z } = require('zod');
 const { getGscClient } = require('../gsc-client');
 
-// ── Zod 输入 schema ────────────────────────────────────────────
+// ── Zod input schema ────────────────────────────────────────────
 const inputSchema = z.object({
   siteUrl: z
     .string()
-    .describe('GSC 站点 URL，例如 https://glq-api.asia/'),
+    .describe('GSC site URL, e.g. https://example.com/'),
   inspectionUrl: z
     .string()
     .url()
     .describe(
-      '要探测的目标 URL，例如 https://glq-api.asia/charge-decode/pages/intuit-qb'
+      'Target URL to inspect, e.g. https://example.com/specific-page'
     ),
 });
 
-// ── 工具定义 ──────────────────────────────────────────────────
+// ── Tool definition ─────────────────────────────────────────────
 const toolDefinition = {
   name: 'gsc_inspect_url',
   description:
-    '调用 Google URL Inspection API，实时探测特定 URL 的收录状态、' +
-    'Canonical、抓取状态。返回 verdict、coverageState、indexingState、' +
-    'googleCanonical、userCanonical、lastCrawlTime 等关键字段。',
+    'Calls the Google URL Inspection API to check the real-time index status, ' +
+    'canonical URL, and crawl state of a specific page. Returns verdict, coverageState, ' +
+    'indexingState, googleCanonical, userCanonical, lastCrawlTime, and other key fields.',
   inputSchema: inputSchema,
 };
 
-// ── 核心实现 ──────────────────────────────────────────────────
+// ── Core implementation ─────────────────────────────────────────
 async function executeInspectUrl(args) {
   const { siteUrl, inspectionUrl } = inputSchema.parse(args);
 
   const searchconsole = getGscClient();
 
-  // Step 1: 调用 URL Inspection API
+  // Step 1: Call URL Inspection API
   const response = await searchconsole.urlInspection.index.inspect({
     requestBody: {
       inspectionUrl,
@@ -50,7 +50,7 @@ async function executeInspectUrl(args) {
 
   const result = response.data.inspectionResult;
 
-  // Step 2: 提取关键字段（API 可能返回 null 的字段做兜底）
+  // Step 2: Extract key fields (with fallbacks for potentially null API responses)
   const indexResult = result?.indexStatusResult || {};
   const inspectionResultLink = result?.inspectionResultLink || null;
 
@@ -58,13 +58,13 @@ async function executeInspectUrl(args) {
     inspectionUrl,
     siteUrl,
     verdict: indexResult.verdict || 'UNKNOWN',
-    // verdict 含义：
-    //   PASS  — 页面已收录
-    //   FAIL  — 页面未收录（有具体问题）
-    //   NEUTRAL — 页面未被收录但无严重问题
-    //   PARTIAL — 部分收录
-    coverageState: indexResult.coverageState || '未知',
-    indexingState: indexResult.indexingState || '未知',
+    // verdict meanings:
+    //   PASS    — page is indexed
+    //   FAIL    — page is not indexed (has specific issues)
+    //   NEUTRAL — page is not indexed but has no critical errors
+    //   PARTIAL — partially indexed
+    coverageState: indexResult.coverageState || 'Unknown',
+    indexingState: indexResult.indexingState || 'Unknown',
     googleCanonical: indexResult.googleCanonical || null,
     userCanonical: indexResult.userCanonical || null,
     lastCrawlTime: indexResult.lastCrawlTime || null,
@@ -79,9 +79,9 @@ async function executeInspectUrl(args) {
           })),
         }
       : null,
-    // 速查摘要：一行判断收录健康度
+    // Quick summary: single-line index health assessment
     summary: buildSummary(indexResult),
-    // 原始 API 链接（可在浏览器中打开查看详情）
+    // Raw API link (open in browser for full details)
     inspectionLink: inspectionResultLink,
   };
 
@@ -96,25 +96,25 @@ async function executeInspectUrl(args) {
 }
 
 /**
- * 根据 verdict 和 coverageState 生成一行速查摘要。
+ * Generates a single-line quick summary based on verdict and coverageState.
  */
 function buildSummary(indexResult) {
   const verdict = indexResult?.verdict;
   const coverage = indexResult?.coverageState;
 
   if (verdict === 'PASS') {
-    return `✅ 已收录 — Google 已索引此页面（coverage: ${coverage}）`;
+    return `✅ Indexed — Google has indexed this page (coverage: ${coverage})`;
   }
   if (verdict === 'FAIL') {
-    return `❌ 收录失败 — 页面存在问题，需检查具体原因（coverage: ${coverage}）`;
+    return `❌ Indexing failed — page has issues, investigate specifics (coverage: ${coverage})`;
   }
   if (verdict === 'NEUTRAL') {
-    return `⚠️ 未收录 — 页面未被 Google 索引，但无明确错误（coverage: ${coverage}）`;
+    return `⚠️ Not indexed — page is not in the Google index, but no critical errors found (coverage: ${coverage})`;
   }
   if (verdict === 'PARTIAL') {
-    return `🔶 部分收录 — 页面部分索引（coverage: ${coverage}）`;
+    return `🔶 Partially indexed — page is partially indexed (coverage: ${coverage})`;
   }
-  return `❓ 状态未知 — 无法确定收录状态（coverage: ${coverage}）`;
+  return `❓ Unknown status — unable to determine index status (coverage: ${coverage})`;
 }
 
 module.exports = { toolDefinition, executeInspectUrl };

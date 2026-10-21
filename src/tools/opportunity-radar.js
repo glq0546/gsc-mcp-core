@@ -1,34 +1,34 @@
 /**
  * Tool: gsc_opportunity_radar
  *
- * 扫描 GSC 数据，找出"高展现 + 低 CTR + 中等排名"的机会词。
- * 使用分段 CTR 模型预估增量收益，输出处方级建议。
+ * Scans GSC data to find "high impressions + low CTR + mid-range ranking" keyword opportunities.
+ * Uses a segmented CTR model to estimate incremental traffic gains and outputs prescription-grade advice.
  *
- * 分段 CTR 模型（行业经验值，估算非保证）：
- *   - 排名 1-3 位：预估 CTR 28%（首页顶部黄金位）
- *   - 排名 4-6 位：预估 CTR 12%（首页中下部）
- *   - 排名 7-10 位：预估 CTR 5%（首页底部 / 第二页顶部）
+ * Segmented CTR model (industry benchmarks, estimates not guaranteed):
+ *   - Rank 1-3:   estimated CTR 28% (top of page 1)
+ *   - Rank 4-6:   estimated CTR 12% (mid / lower page 1)
+ *   - Rank 7-10:  estimated CTR 5%  (bottom of page 1 / top of page 2)
  *
- * 测算假设：
- *   1. CTR 曲线基于 Google 公开的行业基准研究（2024-2025 多项学术研究）
- *   2. 实际 CTR 因行业、品牌词 vs 非品牌词、SERP 特征（广告/精选摘要/People Also Ask）差异很大
- *   3. 增量收益 = (目标CTR - 当前CTR) × 展现量，假设排名优化后展现量不变
- *   4. 这是方向性估算，不是精确预测 — 真实效果取决于内容质量和竞争变化
+ * Estimation assumptions:
+ *   1. CTR curve is based on publicly available Google industry benchmark studies (2024-2025 academic research)
+ *   2. Actual CTR varies significantly by industry, branded vs non-branded queries, and SERP features (ads / featured snippets / People Also Ask)
+ *   3. Incremental clicks = (targetCTR - currentCTR) × impressions, assuming impressions remain stable after ranking improvement
+ *   4. This is a directional estimate, not a precise prediction — real results depend on content quality and competitive dynamics
  */
 
 const { z } = require('zod');
 const { getGscClient, getDateRange } = require('../gsc-client');
 
-// ── 分段 CTR 模型常量 ─────────────────────────────────────────
+// ── Segmented CTR model constants ───────────────────────────────
 const CTR_TIERS = [
-  { min: 1, max: 3, ctr: 0.28, label: '1-3 位 (首页顶部)' },
-  { min: 4, max: 6, ctr: 0.12, label: '4-6 位 (首页中下部)' },
-  { min: 7, max: 10, ctr: 0.05, label: '7-10 位 (首页底部)' },
+  { min: 1, max: 3, ctr: 0.28, label: 'Rank 1-3 (top of page 1)' },
+  { min: 4, max: 6, ctr: 0.12, label: 'Rank 4-6 (mid page 1)' },
+  { min: 7, max: 10, ctr: 0.05, label: 'Rank 7-10 (bottom of page 1)' },
 ];
 
 /**
- * 根据当前排名获取目标 CTR（取该排名所在分段的 CTR）。
- * 如果排名 > 10，返回最低分段 CTR。
+ * Returns the target CTR tier for a given average position.
+ * If position > 10, returns the lowest tier (optimizing into top 10).
  */
 function getTargetCtr(avgPosition) {
   for (const tier of CTR_TIERS) {
@@ -36,55 +36,55 @@ function getTargetCtr(avgPosition) {
       return tier;
     }
   }
-  // 排名 > 10，按第 7-10 位分段估算（假设优化到前 10）
+  // position > 10, estimate using the 7-10 tier (assuming optimization into top 10)
   return CTR_TIERS[CTR_TIERS.length - 1];
 }
 
-// ── Zod 输入 schema ────────────────────────────────────────────
+// ── Zod input schema ────────────────────────────────────────────
 const inputSchema = z.object({
   siteUrl: z
     .string()
-    .describe('GSC 站点 URL，例如 https://glq-api.asia/'),
+    .describe('GSC site URL, e.g. https://example.com/'),
   daysBack: z
     .number()
     .int()
     .min(1)
     .max(90)
     .default(7)
-    .describe('回溯天数（默认 7 天）'),
+    .describe('Lookback window in days (default 7)'),
   minImpressions: z
     .number()
     .int()
     .min(0)
     .default(100)
-    .describe('最低展现量筛选（过滤低量噪音词，默认 100）'),
+    .describe('Minimum impressions filter (filters low-volume noise, default 100)'),
   maxPosition: z
     .number()
     .min(1)
     .max(50)
     .default(20)
-    .describe('最高排名筛选（只关注排名 ≤ 此值的词，默认 20）'),
+    .describe('Maximum average position to include (default 20)'),
   topN: z
     .number()
     .int()
     .min(1)
     .max(50)
     .default(10)
-    .describe('返回 Top N 机会词（默认 10）'),
+    .describe('Return Top N opportunities (default 10)'),
 });
 
-// ── 工具定义 ──────────────────────────────────────────────────
+// ── Tool definition ─────────────────────────────────────────────
 const toolDefinition = {
   name: 'gsc_opportunity_radar',
   description:
-    '扫描 Google Search Console 数据，找出高展现量但低 CTR 的 SEO 机会词。' +
-    '使用分段 CTR 模型预估排名优化后的增量点击量，并给出 3 条处方级建议' +
-    '（标题重构、AI 答案胶囊、内链加权）。输出包含扫描概览、Top 机会词列表、' +
-    '增量收益预测和优先处理建议。',
+    'Scans Google Search Console data to find high-impression, low-CTR SEO opportunity keywords. ' +
+    'Uses a segmented CTR model to estimate incremental clicks after ranking improvement, ' +
+    'and provides 3 prescription-grade recommendations (Title Optimization, AI Answer Capsule, Internal Linking). ' +
+    'Output includes scan overview, top opportunities list, incremental gain forecast, and prioritization advice.',
   inputSchema: inputSchema,
 };
 
-// ── 核心实现 ──────────────────────────────────────────────────
+// ── Core implementation ─────────────────────────────────────────
 async function executeOpportunityRadar(args) {
   const { siteUrl, daysBack, minImpressions, maxPosition, topN } =
     inputSchema.parse(args);
@@ -92,14 +92,14 @@ async function executeOpportunityRadar(args) {
   const searchconsole = getGscClient();
   const { startDate, endDate } = getDateRange(daysBack);
 
-  // Step 1: 拉取按 query 维度的数据
+  // Step 1: Fetch query-level data
   const response = await searchconsole.searchanalytics.query({
     siteUrl,
     requestBody: {
       startDate,
       endDate,
       dimensions: ['query'],
-      rowLimit: 250, // 拉取足够多的行用于筛选
+      rowLimit: 250, // fetch enough rows for filtering
       dataState: 'final',
     },
   });
@@ -113,7 +113,7 @@ async function executeOpportunityRadar(args) {
           text: JSON.stringify(
             {
               overview: { siteUrl, startDate, endDate, daysBack },
-              message: '该时间段内无 GSC 数据。请检查时间范围或站点 URL。',
+              message: 'No GSC data for this period. Check the date range or site URL.',
               opportunities: [],
             },
             null,
@@ -124,7 +124,7 @@ async function executeOpportunityRadar(args) {
     };
   }
 
-  // Step 2: 筛选 & 计算增量收益
+  // Step 2: Filter & calculate incremental gains
   const opportunities = rows
     .filter((row) => {
       const position = row.position;
@@ -135,21 +135,21 @@ async function executeOpportunityRadar(args) {
       const query = row.keys[0];
       const clicks = row.clicks;
       const impressions = row.impressions;
-      const currentCtr = row.ctr; // googleapis 返回的是 0-1 小数
+      const currentCtr = row.ctr; // googleapis returns a 0-1 decimal
       const position = row.position;
 
-      // 分段 CTR 模型
+      // Segmented CTR model
       const tier = getTargetCtr(position);
       const targetCtr = tier.ctr;
 
-      // 增量收益预测
+      // Incremental gain forecast
       const currentClicks = clicks;
       const predictedClicks = impressions * targetCtr;
       const incrementalClicks = Math.round(predictedClicks - currentClicks);
-      // 如果当前 CTR 已经高于目标 CTR（可能品牌词），不产生增量
+      // If current CTR already exceeds target CTR (likely branded), no incremental gain
       const positiveIncremental = Math.max(0, incrementalClicks);
 
-      // 当前 CTR 百分比
+      // Current CTR percentage
       const currentCtrPct = (currentCtr * 100).toFixed(2);
 
       return {
@@ -164,11 +164,11 @@ async function executeOpportunityRadar(args) {
         incrementalClicks: positiveIncremental,
       };
     })
-    // 按增量收益降序排列
+    // Sort by incremental gain descending
     .sort((a, b) => b.incrementalClicks - a.incrementalClicks)
     .slice(0, topN);
 
-  // Step 3: 生成处方建议
+  // Step 3: Generate prescription advice
   const opportunitiesWithAdvice = opportunities.map((opp, idx) => ({
     rank: idx + 1,
     query: opp.query,
@@ -182,13 +182,13 @@ async function executeOpportunityRadar(args) {
     prescriptions: generatePrescriptions(opp),
   }));
 
-  // Step 4: 确定优先处理的 Top 3 词
+  // Step 4: Identify Top 3 keywords to prioritize
   const top3 = opportunitiesWithAdvice.slice(0, 3).map((o) => ({
     query: o.query,
-    reason: `排名 ${o.currentPosition} → 目标 ${o.targetTier}，预估增量 +${o.incrementalClicks} 点击/周期`,
+    reason: `Position ${o.currentPosition} → Target ${o.targetTier}, est. +${o.incrementalClicks} clicks/period`,
   }));
 
-  // Step 5: 构建输出
+  // Step 5: Build output
   const output = {
     overview: {
       siteUrl,
@@ -202,7 +202,7 @@ async function executeOpportunityRadar(args) {
       opportunitiesFound: opportunities.length,
     },
     ctrModelNote:
-      '分段 CTR 模型基于行业基准研究（2024-2025），实际效果因行业、SERP 特征、品牌词占比差异较大。此为方向性估算，非精确预测。',
+      'Segmented CTR model based on industry benchmark research (2024-2025). Actual results vary by industry, SERP features, and branded keyword share. This is a directional estimate, not a precise prediction.',
     ctrTiers: CTR_TIERS.map((t) => ({
       rankRange: t.label,
       estimatedCtr: `${(t.ctr * 100).toFixed(0)}%`,
@@ -222,7 +222,7 @@ async function executeOpportunityRadar(args) {
 }
 
 /**
- * 为每个机会词生成 3 条处方级建议
+ * Generates 3 prescription-grade recommendations for each opportunity keyword
  */
 function generatePrescriptions(opp) {
   const query = opp.query;
@@ -230,24 +230,24 @@ function generatePrescriptions(opp) {
 
   return [
     {
-      type: '标题重构',
-      action: `在 <title> 和 H1 中包含 "${query}" 关键词，并添加数字或情感词提升 CTR`,
+      type: 'Title Optimization',
+      action: `Include "${query}" in <title> and H1, and add numbers or power words to boost CTR`,
       detail:
         position <= 6
-          ? '当前已在首页，标题优化可直接提升 CTR 3-8 个百分点'
-          : '标题优化有助于从搜索结果中脱颖而出，配合排名提升效果叠加',
+          ? 'Already on page 1 — title optimization can directly lift CTR by 3-8 percentage points'
+          : 'A compelling title helps the result stand out in SERPs; combined with ranking improvement, effects compound',
     },
     {
-      type: 'AI 答案胶囊',
-      action: `在页面顶部添加针对 "${query}" 的直接回答段落（40-60 字），争取 Google AI Overview 引用`,
+      type: 'AI Answer Capsule',
+      action: `Add a concise direct-answer paragraph (40-60 words) targeting "${query}" at the top of the page to earn Google AI Overview citations`,
       detail:
-        'AI Overview 引用可带来额外曝光，即使排名不变也能获得 Featured Snippet 流量',
+        'AI Overview citations drive additional visibility — even without a ranking change, you can capture Featured Snippet traffic',
     },
     {
-      type: '内链加权',
-      action: `从本站高流量页面添加指向该页面的内链，锚文本使用 "${query}" 或其变体`,
+      type: 'Internal Linking',
+      action: `Add internal links from high-traffic pages on your site pointing to this page, using "${query}" or close variants as anchor text`,
       detail:
-        '内链传递 PageRank 和上下文信号，帮助搜索引擎理解页面主题并提升目标关键词排名',
+        'Internal links pass PageRank and contextual signals, helping search engines understand the page topic and boosting target keyword rankings',
     },
   ];
 }

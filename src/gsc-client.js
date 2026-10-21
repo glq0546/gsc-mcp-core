@@ -26,8 +26,8 @@ const REQUIRED_KEYS = [
 const missing = REQUIRED_KEYS.filter((key) => !process.env[key]);
 if (missing.length > 0) {
   throw new Error(
-    `缺少环境变量: ${missing.join(', ')}\n` +
-    `请确保 .env.local 中已填入 Day 1 获取的凭据。`
+    `Missing environment variables: ${missing.join(', ')}\n` +
+    `Make sure .env.local contains the OAuth credentials.`
   );
 }
 
