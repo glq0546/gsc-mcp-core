@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GSC 工具测试台</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+    .container { max-width: 960px; margin: 0 auto; }
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+      color: #f8fafc;
+    }
+    .subtitle { color: #94a3b8; font-size: 0.875rem; margin-bottom: 1.5rem; }
+
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .input-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .input-group { margin-bottom: 1rem; }
+    .input-row .input-group { margin-bottom: 0; }
+    .input-group label {
+      display: block;
+      font-size: 0.8rem;
+      color: #94a3b8;
+      margin-bottom: 0.35rem;
+    }
+    .input-group input {
+      width: 100%;
+      padding: 0.65rem 0.85rem;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .input-group input:focus { border-color: #3b82f6; }
+
+    .btn-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    button {
+      padding: 0.65rem 1.4rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: #3b82f6;
+      color: #fff;
+    }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-secondary {
+      background: #10b981;
+      color: #fff;
+    }
+    .btn-secondary:hover { background: #059669; }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .result-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 1.5rem;
+      min-height: 200px;
+    }
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .result-header h2 {
+      font-size: 1rem;
+      color: #f8fafc;
+    }
+    .status-badge {
+      font-size: 0.75rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+    .status-success { background: #064e3b; color: #34d399; }
+    .status-error { background: #7f1d1d; color: #f87171; }
+    .status-loading { background: #1e3a5f; color: #60a5fa; }
+
+    pre {
+      background: #0f172a;
+      border-radius: 8px;
+      padding: 1rem;
+      overflow-x: auto;
+      font-size: 0.8rem;
+      line-height: 1.6;
+      color: #a5f3fc;
+      max-height: 600px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .empty-state {
+      text-align: center;
+      color: #64748b;
+      padding: 3rem 0;
+      font-size: 0.9rem;
+    }
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid #3b82f6;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>GSC 工具测试台</h1>
+    <p class="subtitle">本地 Web UI — 直接调用 opportunity-radar 和 inspect-url 工具</p>
+
+    <div class="card">
+      <div class="input-group">
+        <label for="siteUrl">站点 URL</label>
+        <input type="url" id="siteUrl" value="https://glq-api.asia/" placeholder="https://example.com/" />
+      </div>
+      <div class="input-row">
+        <div class="input-group">
+          <label for="minImpressions">最小曝光量</label>
+          <input type="number" id="minImpressions" value="1" min="0" />
+        </div>
+        <div class="input-group">
+          <label for="daysBack">回溯天数</label>
+          <input type="number" id="daysBack" value="30" min="1" max="90" />
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-primary" id="btnRadar" onclick="runOpportunityRadar()">扫描机会词</button>
+        <button class="btn-secondary" id="btnInspect" onclick="runInspectUrl()">探测收录</button>
+      </div>
+    </div>
+
+    <div class="result-card">
+      <div class="result-header">
+        <h2>结果</h2>
+        <span id="statusBadge" class="status-badge" style="display:none;"></span>
+      </div>
+      <div id="resultArea">
+        <div class="empty-state">点击上方按钮开始测试</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function runOpportunityRadar() {
+      const btn = document.getElementById('btnRadar');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>扫描中...';
+      setBadge('loading', '加载中');
+      showResult('<span class="spinner"></span> 正在从 GSC 拉取数据，请稍候...');
+
+      try {
+        const siteUrl = document.getElementById('siteUrl').value.trim();
+        const minImpressions = parseInt(document.getElementById('minImpressions').value, 10) || 1;
+        const daysBack = parseInt(document.getElementById('daysBack').value, 10) || 30;
+        const res = await fetch('/api/opportunity-radar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ siteUrl, minImpressions, daysBack }),
+        });
+        const json = await res.json();
+        if (json.success) {
+          setBadge('success', '成功');
+          showResult(JSON.stringify(json.data, null, 2));
+        } else {
+          setBadge('error', '失败');
+          showResult('错误: ' + json.error);
+        }
+      } catch (err) {
+        setBadge('error', '失败');
+        showResult('请求失败: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '扫描机会词';
+      }
+    }
+
+    async function runInspectUrl() {
+      const btn = document.getElementById('btnInspect');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>探测中...';
+      setBadge('loading', '加载中');
+      showResult('<span class="spinner"></span> 正在调用 URL Inspection API...');
+
+      try {
+        const siteUrl = document.getElementById('siteUrl').value.trim();
+        const res = await fetch('/api/inspect-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ siteUrl }),
+        });
+        const json = await res.json();
+        if (json.success) {
+          setBadge('success', '成功');
+          showResult(JSON.stringify(json.data, null, 2));
+        } else {
+          setBadge('error', '失败');
+          showResult('错误: ' + json.error);
+        }
+      } catch (err) {
+        setBadge('error', '失败');
+        showResult('请求失败: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '探测收录';
+      }
+    }
+
+    function showResult(content) {
+      document.getElementById('resultArea').innerHTML = '<pre>' + escapeHtml(content) + '</pre>';
+    }
+
+    function setBadge(type, text) {
+      const badge = document.getElementById('statusBadge');
+      badge.style.display = 'inline-block';
+      badge.className = 'status-badge status-' + type;
+      badge.textContent = text;
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+  </script>
+</body>
+</html>

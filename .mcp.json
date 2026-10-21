@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "gsc-mcp-core": {
+      "command": "node",
+      "args": ["C:\\Users\\Administrator\\Desktop\\gsc-mcp-core\\src\\index.js"],
+      "env": {
+        "HTTPS_PROXY": "http://127.0.0.1:7892",
+        "HTTP_PROXY": "http://127.0.0.1:7892"
+      }
+    }
+  }
+}
