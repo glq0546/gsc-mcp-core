@@ -20,7 +20,6 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
 const REQUIRED_KEYS = [
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
-  'GOOGLE_REFRESH_TOKEN',
 ];
 
 const missing = REQUIRED_KEYS.filter((key) => !process.env[key]);
@@ -65,43 +64,31 @@ function getProxyAgent() {
 
 const proxyAgent = getProxyAgent();
 
-// ── 单例 OAuth2 客户端（自动通过 refresh_token 换取 access_token） ──
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/oauth2callback'
-);
-
-oauth2Client.setCredentials({
-  refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
-});
-
-// ── 代理注入（googleapis v186 的 transporter 不自动使用系统代理）
-// 必须通过 transporter.defaults.agent 注入，才能覆盖 OAuth token 刷新和 API 调用。
-if (proxyAgent) {
-  oauth2Client.transporter.defaults = { ...oauth2Client.transporter.defaults, agent: proxyAgent };
-}
-
-// ── Search Console API 客户端 ──────────────────────────────────
-const searchconsole = google.searchconsole({
-  version: 'v1',
-  auth: oauth2Client,
-});
-
 /**
- * 返回已认证的 Google Search Console API 客户端。
+ * 返回已认证的 Google Search Console API 客户端（工厂函数）。
+ * 每个请求都应调用此函数创建新的客户端，避免跨用户状态污染。
+ * @param {string} refreshToken - 用户的 Google OAuth refresh token
  * @returns {import('googleapis').searchconsole_v1.Searchconsole}
  */
-function getGscClient() {
-  return searchconsole;
-}
+function createGscClient(refreshToken) {
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/oauth2callback'
+  );
 
-/**
- * 返回已认证的 OAuth2 客户端（用于 sites.list 等操作）。
- * @returns {import('googleapis').OAuth2Client}
- */
-function getAuthClient() {
-  return oauth2Client;
+  oauth2Client.setCredentials({ refresh_token: refreshToken });
+
+  // ── 代理注入（googleapis v186 的 transporter 不自动使用系统代理）
+  // 必须通过 transporter.defaults.agent 注入，才能覆盖 OAuth token 刷新和 API 调用。
+  if (proxyAgent) {
+    oauth2Client.transporter.defaults = { ...oauth2Client.transporter.defaults, agent: proxyAgent };
+  }
+
+  return google.searchconsole({
+    version: 'v1',
+    auth: oauth2Client,
+  });
 }
 
 /**
@@ -119,4 +106,5 @@ function getDateRange(daysBack = 7) {
   return { startDate: fmt(startDate), endDate: fmt(endDate) };
 }
 
-module.exports = { getGscClient, getAuthClient, getDateRange };
+module.exports = { createGscClient, getDateRange };
+

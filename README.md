@@ -35,6 +35,60 @@ gsc-mcp-core/
 
 ---
 
+## 🔐 多租户登录（Supabase Auth + Google OAuth）
+
+### 1) Supabase 后台配置
+
+| 位置 | 填什么 |
+| --- | --- |
+| Authentication → Providers → Google | 打开开关，粘贴 `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`（复用现有凭据，不要新建 OAuth Client） |
+| 同上，页面里的 **Callback URL (for OAuth)** | 复制它（形如 `https://<project-ref>.supabase.co/auth/v1/callback`），粘到 Google Cloud Console |
+| Google Cloud Console → Credentials → 该 OAuth 客户端 | **Authorized redirect URIs** 添加上面那个 Supabase 回调地址；**Authorized JavaScript origins** 添加 `http://localhost:3000` 与线上域名 |
+| Authentication → URL Configuration | Site URL = `http://localhost:3000`；Redirect URLs 加 `http://localhost:3000/**`（线上同理加 `https://your-domain/**`） |
+
+> ⚠️ 回调地址填错是本流程最常见故障：`redirect_uri_mismatch` 说明 Google 侧没加 Supabase 的回调地址；
+> 登录后跳回 `localhost` 但报错，说明 Supabase 的 Redirect URLs 白名单没加 `/auth/callback`。
+
+### 2) 数据库
+
+在 SQL Editor 执行 `supabase/migrations/0002_add_provider_token.sql`，为 `users_tokens` 增加
+`provider_token` 列（保存 Supabase 下发的短期 Google access_token）。
+
+### 3) 代码结构
+
+```
+app/
+├── page.tsx                          # 首页，Header 挂载 <GoogleSignInButton />
+├── components/
+│   └── GoogleSignInButton.tsx        # 登录/登出按钮 + signInWithOAuth（access_type=offline）
+└── auth/callback/route.ts            # 服务端：code → session → 写 users_tokens
+src/lib/supabase/
+├── browser.ts                        # 浏览器端客户端（会话存 cookie）
+└── server.ts                         # 服务端客户端（读 cookie）
+```
+
+### 4) 凭据落库流程
+
+```
+点击登录
+  → signInWithOAuth({ provider: 'google', scopes: [...,webmasters.readonly],
+                      queryParams: { access_type: 'offline', prompt: 'consent' } })
+  → 跳转 https://<ref>.supabase.co/auth/v1/authorize?provider=google
+  → Google 授权
+  → 回跳 /auth/callback?code=xxx
+  → exchangeCodeForSession(code) 得到 session.provider_token / provider_refresh_token
+  → storeProviderTokens() 用 service_role 写入 users_tokens（upsert on user_email）
+  → 302 回 /?auth=connected
+```
+
+**为什么 token 不经过浏览器 JS**：`users_tokens` 开了 RLS 且零策略，publishable key 写不进；
+把 service_role 放进前端等于数据库裸奔。所以刷新凭据只在 Route Handler 内流转。
+
+**为什么必须 `access_type=offline`**：不加这个参数 Google 不下发 refresh token；
+`prompt=consent` 保证二次登录时仍会重新下发（否则只能拿到 1 小时有效的 access token）。
+
+---
+
 ## 🚀 快速开始
 
 ### 前置条件

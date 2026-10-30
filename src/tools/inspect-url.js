@@ -9,7 +9,7 @@
  */
 
 const { z } = require('zod');
-const { getGscClient } = require('../gsc-client');
+const { createGscClient } = require('../gsc-client');
 
 // ── Zod input schema ────────────────────────────────────────────
 const inputSchema = z.object({
@@ -35,10 +35,10 @@ const toolDefinition = {
 };
 
 // ── Core implementation ─────────────────────────────────────────
-async function executeInspectUrl(args) {
+async function executeInspectUrl(args, gscClient) {
   const { siteUrl, inspectionUrl } = inputSchema.parse(args);
 
-  const searchconsole = getGscClient();
+  const searchconsole = gscClient;
 
   // Step 1: Call URL Inspection API
   const response = await searchconsole.urlInspection.index.inspect({

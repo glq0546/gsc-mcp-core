@@ -25,6 +25,7 @@ npm-debug.log*
 # Build
 build/
 dist/
+*.tsbuildinfo
 
 # IDE
 .vscode/

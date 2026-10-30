@@ -17,7 +17,7 @@
  */
 
 const { z } = require('zod');
-const { getGscClient, getDateRange } = require('../gsc-client');
+const { createGscClient, getDateRange } = require('../gsc-client');
 
 // ── Segmented CTR model constants ───────────────────────────────
 const CTR_TIERS = [
@@ -85,11 +85,11 @@ const toolDefinition = {
 };
 
 // ── Core implementation ─────────────────────────────────────────
-async function executeOpportunityRadar(args) {
+async function executeOpportunityRadar(args, gscClient) {
   const { siteUrl, daysBack, minImpressions, maxPosition, topN } =
     inputSchema.parse(args);
 
-  const searchconsole = getGscClient();
+  const searchconsole = gscClient;
   const { startDate, endDate } = getDateRange(daysBack);
 
   // Step 1: Fetch query-level data
