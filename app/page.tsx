@@ -236,6 +236,18 @@ export default function Home() {
             )}
           </div>
         </div>
+
+        <p className="text-center text-gray-500 text-sm mt-8">
+          Found issues with your site?{' '}
+          <a
+            href="https://decodeglq.gumroad.com/l/charge-decoder-pro"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-indigo-400 hover:text-indigo-300 underline"
+          >
+            Get the Pro SEO & Chargeback Guide ($9.99)
+          </a>
+        </p>
       </div>
     </main>
   );
