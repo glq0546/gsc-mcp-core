@@ -1,0 +1,17 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.glq0546/gsc-mcp-core",
+  "title": "GSC MCP Core",
+  "description": "Multi-tenant GSC data fetcher for AI agents. OAuth secured.",
+  "repository": {
+    "url": "https://github.com/glq0546/gsc-mcp-core",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://gsc-mcp-core.vercel.app/api/mcp"
+    }
+  ]
+}

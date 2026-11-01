@@ -45,6 +45,7 @@ gsc-mcp-core/
 │   ├── components/GoogleSignInButton.tsx
 │   ├── auth/callback/route.ts          # code → session → 写 users_tokens
 │   └── api/
+│       ├── mcp/route.ts                # POST：Streamable HTTP MCP 端点（Bearer API Key）
 │       ├── radar/route.ts              # POST：鉴权后跑机会词雷达
 │       └── inspect/route.ts            # POST：鉴权后跑 URL 收录检查
 ├── src/
@@ -53,6 +54,7 @@ gsc-mcp-core/
 │   ├── gsc-client.js                   # 共享 GSC 客户端（OAuth + 代理）
 │   ├── middleware.ts                   # Supabase token 刷新（Edge Runtime）
 │   ├── lib/
+│   │   ├── api-keys.ts                 # MCP API Key：生成 / sha256 摘要 / 反查租户
 │   │   ├── supabase.ts                 # getUserToken() 等服务端数据访问
 │   │   └── supabase/
 │   │       ├── browser.ts              # 浏览器端客户端
@@ -192,6 +194,107 @@ vercel --prod     # 或直接 push 到 main，由 Vercel 自动构建
 `app/layout.tsx` 挂载的是 `@vercel/analytics/next` 的 `<Analytics />`。
 它专为 Next.js 设计，会跟随客户端路由切换自动上报 pageview（`/react` 入口只在首次进入时上报一次）。
 部署后到 Vercel 项目 → Analytics 查看数据。
+
+---
+
+## 🌐 远程 MCP 端点（`/api/mcp`）
+
+Web 控制台之外，云端还对外暴露一个标准 MCP **Streamable HTTP** 端点，MCP 客户端可以直接连：
+
+| 项 | 值 |
+| --- | --- |
+| 端点 | `https://gsc-mcp-core.vercel.app/api/mcp` |
+| 传输 | Streamable HTTP（无状态，`application/json` 响应） |
+| 方法 | `POST`（`GET` / `DELETE` 返回 405，无状态模式没有会话可关） |
+| 鉴权 | `Authorization: Bearer <API_KEY>` |
+
+实现要点（`app/api/mcp/route.ts`）：
+
+- 用 SDK 的 `WebStandardStreamableHTTPServerTransport`（原生 `Request`/`Response`）包住
+  `src/server.js` 的 `createMcpServer()`，工具实现零改动；
+- `sessionIdGenerator: undefined` → 无状态，适配 Vercel serverless 多实例；
+- `enableJsonResponse: true` → 回 JSON 而不是挂 SSE 长连接，省执行时间、好调试；
+- 鉴权链路：`Bearer Key` → `sha256` → `users_tokens.api_key_hash` → 该租户自己的
+  Google refresh token → `createGscClient()`。**不同租户的凭据不会互相串用。**
+
+### 1) 建表
+
+Supabase Dashboard → SQL Editor → 执行 `supabase/migrations/0003_add_api_keys.sql`
+（新增 `api_key_hash` / `api_key_prefix` / `api_key_created_at` / `api_key_last_used_at`）。
+
+### 2) 签发 API Key
+
+```bash
+npm run api-key -- you@example.com
+```
+
+- 明文 **只显示一次**，数据库只存 sha256 摘要；
+- 再跑一次同一命令即为**轮换**，旧 Key 立即失效；
+- 前提是该邮箱已在 `users_tokens` 里（用户先完成一次 Google 登录授权）。
+
+### 3) 验证端点
+
+```bash
+curl -s -i -X POST http://localhost:3000/api/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Authorization: Bearer $GSC_MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"0.0.0"}}}'
+```
+
+> ⚠️ **Windows PowerShell 5.1 用户注意**：`curl.exe -d '{"jsonrpc":...}'` 会被 PowerShell 吞掉双引号，
+> 服务端收到非法 JSON 并返回 `-32700 Parse error`。请改用正文文件：
+
+```powershell
+$body = @'
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"0.0.0"}}}
+'@
+Set-Content -Path "$env:TEMP\mcp-init.json" -Value $body -Encoding ascii
+
+curl.exe -s -i -X POST http://localhost:3000/api/mcp `
+  -H "Content-Type: application/json" `
+  -H "Accept: application/json, text/event-stream" `
+  -H "Authorization: Bearer $env:GSC_MCP_API_KEY" `
+  --data-binary "@$env:TEMP\mcp-init.json"
+```
+
+期望 `HTTP/1.1 200` 且 body 里出现：
+
+```json
+{"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{"listChanged":true}},"serverInfo":{"name":"gsc-mcp-core","version":"1.0.0"}},"jsonrpc":"2.0","id":1}
+```
+
+想看工具清单，把 `method` 换成 `tools/list`：
+
+```bash
+curl -s -X POST https://gsc-mcp-core.vercel.app/api/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Authorization: Bearer $GSC_MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+```
+
+常见返回码：`401` 缺 Key 或 Key 无效；`405` 用了 GET；`500` 多半是 0003 迁移没跑。
+
+### 4) 客户端配置
+
+支持远程 MCP 的客户端（Cursor / Claude Code 等）配置形如：
+
+```json
+{
+  "mcpServers": {
+    "gsc-mcp-core": {
+      "url": "https://gsc-mcp-core.vercel.app/api/mcp",
+      "headers": {
+        "Authorization": "Bearer gsc_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      }
+    }
+  }
+}
+```
+
+> ⚠️ Key 等同于该租户的 GSC 读权限，不要提交进 git、不要贴到前端代码里。
+> 泄露了就重新跑 `npm run api-key -- <email>` 轮换。
 
 ---
 

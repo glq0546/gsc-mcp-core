@@ -1,9 +1,9 @@
 /**
  * GSC MCP Core - Day 2 入口文件
  *
- * Transport 层：当前使用 StdioServerTransport（本地 Claude Desktop 测试）。
- * 未来切换到 Streamable HTTP 时，只需替换本文件的 transport 部分，
- * 不需要修改 server.js 或 tools/ 中的任何代码。
+ * Transport 层：本地使用 StdioServerTransport（Claude Desktop 直连）。
+ * 云端多租户的 Streamable HTTP 端点见 app/api/mcp/route.ts ——
+ * 那边只是换了一个 transport，server.js 与 tools/ 完全复用。
  */
 
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
