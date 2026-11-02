@@ -10,6 +10,10 @@ const { executeOpportunityRadar } = require('../../../src/tools/opportunity-rada
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createGscClient } = require('../../../src/gsc-client');
 
+// Raise the serverless execution limit above the 10s default.
+// Scanning 250 Search Analytics rows on a cold start can exceed 10s, which
+// surfaces in the browser as "Failed to fetch".
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   try {

@@ -44,6 +44,10 @@ function getProxyAgent() {
     return new HttpsProxyAgent(proxyUrl);
   }
 
+  // 仅 Windows 存在注册表代理配置（Clash/V2Ray 等）。
+  // Linux / Vercel 等环境直接短路，避免无谓地 spawn `reg` 子进程（在 Linux 上必然 ENOENT）。
+  if (process.platform !== 'win32') return undefined;
+
   // Windows 注册表回退（Clash/V2Ray 等本地代理）
   try { // eslint-disable-next-line global-require
     const { execSync } = require('child_process');
