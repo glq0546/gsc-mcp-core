@@ -3,6 +3,13 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/src/lib/supabase/browser';
 import type { Session } from '@supabase/supabase-js';
+import InspectionResultCard from '@/app/components/InspectionResultCard';
+import OpportunityResults from '@/app/components/OpportunityResults';
+import type {
+  ApiResponse,
+  InspectionResult,
+  RadarResult,
+} from '@/app/types/gsc';
 
 export default function Home() {
   const [siteUrl, setSiteUrl] = useState('https://glq-api.asia/');
@@ -12,7 +19,9 @@ export default function Home() {
   
   const [loading, setLoading] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<
+    ApiResponse<InspectionResult | RadarResult> | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
 
   const [session, setSession] = useState<Session | null>(null);
@@ -118,6 +127,17 @@ export default function Home() {
     }
   };
 
+  // Narrow the wrapped payload so each result kind renders its own card layout.
+  const payload = result?.data;
+  const inspection = payload && 'verdict' in payload ? payload : null;
+  const radar = payload && 'opportunities' in payload ? payload : null;
+  // /api/* returns HTTP 200 with `success: false` for upstream failures.
+  const apiError =
+    error ??
+    (result && result.success === false
+      ? result.error || 'Failed to fetch data'
+      : null);
+
   return (
     <main className="min-h-screen bg-[#0f172a] text-white p-8 font-sans">
       <div className="max-w-4xl mx-auto space-y-8">
@@ -221,14 +241,48 @@ export default function Home() {
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold">Results</h2>
             {loading && <span className="text-yellow-400 text-sm animate-pulse">Loading...</span>}
-            {!loading && result && <span className="bg-emerald-900 text-emerald-300 px-3 py-1 rounded-full text-xs font-bold">Success</span>}
-            {!loading && error && <span className="bg-red-900 text-red-300 px-3 py-1 rounded-full text-xs font-bold">Failed</span>}
+            {!loading && result && !apiError && <span className="bg-emerald-900 text-emerald-300 px-3 py-1 rounded-full text-xs font-bold">Success</span>}
+            {!loading && apiError && <span className="bg-red-900 text-red-300 px-3 py-1 rounded-full text-xs font-bold">Failed</span>}
           </div>
 
-          <div className="bg-[#0f172a] border border-gray-700 rounded-lg p-4 font-mono text-sm overflow-auto max-h-[500px]">
-            {error && <span className="text-red-400">Error: {error}</span>}
-            {result && <pre className="text-emerald-400">{JSON.stringify(result, null, 2)}</pre>}
-            {!result && !error && !loading && (
+          <div className="space-y-4">
+            {apiError && (
+              <div className="bg-red-950/60 border border-red-800/70 rounded-lg p-4 text-sm text-red-300">
+                <p className="font-semibold text-red-200 mb-1">Request failed</p>
+                <p className="break-words">{apiError}</p>
+              </div>
+            )}
+
+            {!apiError && loading && (
+              <div className="bg-[#0f172a] border border-gray-700 rounded-xl flex flex-col items-center justify-center gap-3 py-14 text-gray-400">
+                <span className="w-8 h-8 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin-slow" />
+                <p className="text-sm">Querying Google Search Console...</p>
+              </div>
+            )}
+
+            {!loading && !apiError && inspection && (
+              <InspectionResultCard result={inspection} />
+            )}
+
+            {!loading && !apiError && radar && (
+              <OpportunityResults result={radar} />
+            )}
+
+            {!loading && !apiError && payload && !inspection && !radar && (
+              <div className="bg-[#0f172a] border border-gray-700 rounded-lg p-4 text-sm text-gray-400">
+                <p>Received an unexpected response shape from the API.</p>
+                <details className="mt-3">
+                  <summary className="cursor-pointer text-indigo-400 hover:text-indigo-300">
+                    View raw response
+                  </summary>
+                  <pre className="result-scroll mt-2 max-h-[320px] overflow-auto font-mono text-xs text-gray-300">
+                    {JSON.stringify(result, null, 2)}
+                  </pre>
+                </details>
+              </div>
+            )}
+
+            {!result && !apiError && !loading && (
               <div className="text-gray-500 flex flex-col items-center justify-center py-12">
                 <span className="text-4xl mb-4">🔍</span>
                 <p>Click the buttons above to start testing</p>
