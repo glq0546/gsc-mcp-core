@@ -5,6 +5,7 @@ import { supabase } from '@/src/lib/supabase/browser';
 import type { Session } from '@supabase/supabase-js';
 import InspectionResultCard from '@/app/components/InspectionResultCard';
 import OpportunityResults from '@/app/components/OpportunityResults';
+import ApiKeyCard from '@/app/components/ApiKeyCard';
 import type {
   ApiResponse,
   InspectionResult,
@@ -175,6 +176,11 @@ export default function Home() {
             )}
           </div>
         </div>
+
+        {/* 自助生成 MCP API Key：只在登录后出现，租户身份由服务端 session 决定 */}
+        {!authLoading && session?.user?.email && (
+          <ApiKeyCard email={session.user.email} />
+        )}
 
         <div className="bg-[#1e293b] p-6 rounded-xl border border-gray-700 shadow-lg space-y-4">
           <div>

@@ -56,6 +56,124 @@ export function hashApiKey(rawKey: string): string {
   return createHash('sha256').update(rawKey, 'utf8').digest('hex');
 }
 
+/** 一次成功签发的结果。明文 Key 只存在于这个对象里，不要落库 / 不要打日志。 */
+export interface IssuedApiKey {
+  /** 明文 Key —— 只返回给前端展示一次 */
+  apiKey: string;
+  /** 存进 api_key_prefix 的前缀，可供界面展示「哪一把 Key」 */
+  apiKeyPrefix: string;
+  /** api_key_created_at 写入的时间（ISO 8601） */
+  createdAt: string;
+}
+
+/** 数据库里 users_tokens.api_key_prefix 的长度，与 scripts/create-api-key.js 保持一致。 */
+const API_KEY_PREFIX_LENGTH = 16;
+
+/**
+ * 为已登录用户签发（或轮换）一把新的 API Key，并把摘要写入 users_tokens。
+ *
+ * 这是「Web 页面上点按钮生成 Key」的唯一入口，逻辑与
+ * scripts/create-api-key.js 一致：
+ *   1. generateApiKey() 生成明文；
+ *   2. hashApiKey() 算出 sha256 摘要；
+ *   3. 只把 api_key_hash / api_key_prefix / api_key_created_at 写库。
+ *
+ * ⚠️ 调用方必须先确认 userEmail 来自可信的登录会话（session.user.email），
+ *    否则等于让任何人给任意租户签发 Key。
+ *
+ * 语义是「轮换」：一个租户同时只有一把有效 Key，重新生成会让旧 Key 立即失效。
+ *
+ * @throws 用户还没有 users_tokens 记录（没完成 Google 授权）、缺 service_role key、
+ *         或 0003 迁移未执行时抛出
+ */
+export async function createApiKeyForUser(userEmail: string): Promise<IssuedApiKey> {
+  const normalizedEmail = userEmail.toLowerCase().trim();
+
+  const { data: row, error: selectError } = await getSupabaseAdmin()
+    .from('users_tokens')
+    .select('id')
+    .eq('user_email', normalizedEmail)
+    .maybeSingle();
+
+  if (selectError) {
+    if (selectError.code === '42703') {
+      throw new Error(
+        'users_tokens.api_key_hash does not exist. Run ' +
+          'supabase/migrations/0003_add_api_keys.sql in the Supabase SQL Editor, ' +
+          "then notify pgrst, 'reload schema'."
+      );
+    }
+    throw selectError;
+  }
+
+  if (!row) {
+    throw new Error(
+      `No users_tokens row for ${normalizedEmail}. Sign in with Google once so a ` +
+        'refresh token is stored before generating an API key.'
+    );
+  }
+
+  const apiKey = generateApiKey();
+  const apiKeyPrefix = apiKey.slice(0, API_KEY_PREFIX_LENGTH);
+  const createdAt = new Date().toISOString();
+
+  const { error: updateError } = await getSupabaseAdmin()
+    .from('users_tokens')
+    .update({
+      api_key_hash: hashApiKey(apiKey),
+      api_key_prefix: apiKeyPrefix,
+      api_key_created_at: createdAt,
+      // 新 Key 还没被用过，清空旧的活跃时间避免误导
+      api_key_last_used_at: null,
+    })
+    .eq('id', (row as { id: string }).id);
+
+  if (updateError) {
+    if (updateError.code === '42703') {
+      throw new Error(
+        'users_tokens.api_key_hash does not exist. Run ' +
+          'supabase/migrations/0003_add_api_keys.sql in the Supabase SQL Editor, ' +
+          "then notify pgrst, 'reload schema'."
+      );
+    }
+    throw updateError;
+  }
+
+  return { apiKey, apiKeyPrefix, createdAt };
+}
+
+/**
+ * 读取某个租户当前 Key 的元信息（不含明文，也无法还原明文）。
+ * 页面上用来告诉用户「你已经有一把 Key」，避免误以为重复点击是新建。
+ */
+export async function getApiKeyMetadata(
+  userEmail: string
+): Promise<{ prefix: string; createdAt: string | null } | null> {
+  const { data, error } = await getSupabaseAdmin()
+    .from('users_tokens')
+    .select('api_key_prefix, api_key_created_at')
+    .eq('user_email', userEmail.toLowerCase().trim())
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === '42703') {
+      throw new Error(
+        'users_tokens.api_key_hash does not exist. Run ' +
+          'supabase/migrations/0003_add_api_keys.sql in the Supabase SQL Editor, ' +
+          "then notify pgrst, 'reload schema'."
+      );
+    }
+    throw error;
+  }
+
+  if (!data) return null;
+
+  const row = data as { api_key_prefix: string | null; api_key_created_at: string | null };
+  if (!row.api_key_prefix) return null;
+
+  return { prefix: row.api_key_prefix, createdAt: row.api_key_created_at };
+}
+
 /**
  * 从 Authorization 头里取出 Bearer 凭据。
  * 兼容大小写（Bearer / bearer），不符合格式返回 null。
