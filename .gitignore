@@ -30,3 +30,6 @@ dist/
 # IDE
 .vscode/
 .idea/
+
+# Local tool binary (download separately, not tracked)
+mcp-publisher.exe
