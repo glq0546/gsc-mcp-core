@@ -10,6 +10,10 @@ const { executeInspectUrl } = require('../../../src/tools/inspect-url');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createGscClient } = require('../../../src/gsc-client');
 
+// Raise the serverless execution limit above the 10s default.
+// The URL Inspection API performs a live crawl check and can take well over 10s
+// on a cold start, which surfaces in the browser as "Failed to fetch".
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   try {
