@@ -8,6 +8,8 @@
  *       本文件刻意不写死版本号，避免两处版本各走各的
  * 鉴权层：Authorization: Bearer <API_KEY>
  *         → sha256 反查 users_tokens → 取该租户的 Google refresh token
+ * 限流层：每租户每天 50 次（UTC 自然日），计数由 Postgres 的
+ *         increment_mcp_daily_calls() 原子完成，超限直接 429（见 0004 迁移）
  *
  * 为什么是「无状态」模式（sessionIdGenerator: undefined）：
  *   Vercel 是 serverless，多个实例之间不共享内存，MCP 的 in-memory session
@@ -27,6 +29,11 @@ import {
   markApiKeyUsed,
   resolveApiKey,
 } from '../../../src/lib/api-keys';
+import {
+  consumeMcpDailyQuota,
+  rateLimitHeaders,
+  secondsUntilNextUtcMidnight,
+} from '../../../src/lib/rate-limit';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createMcpServer } = require('../../../src/server');
@@ -99,7 +106,31 @@ export async function POST(request: Request): Promise<Response> {
     });
   }
 
-  // ── Step 3: 用该租户的凭据跑 MCP ──────────────────────────────
+  // ── Step 3: 每日配额（原子计数，防刷）──────────────────────────
+  // 只有鉴权通过才计数，避免无效 Key 白烧配额。
+  // 迁移 0004 未执行或数据库抖动时「放行 + 记日志」：限流是保护组件，
+  // 它不可用不应该让整个 MCP 端点宕机。配额一旦可用立刻自动生效。
+  let quota: Awaited<ReturnType<typeof consumeMcpDailyQuota>> | null = null;
+  try {
+    quota = await consumeMcpDailyQuota(identity.userId);
+  } catch (err) {
+    console.error('[mcp] Daily quota check failed (allowing request):', err);
+  }
+
+  if (quota && !quota.allowed) {
+    // 跨天重置：Retry-After 指向下一个 UTC 零点，客户端可据此自动重试
+    return jsonRpcError(
+      429,
+      -32000,
+      `Daily limit of ${quota.limit} requests reached. Please try again tomorrow or upgrade to Pro.`,
+      {
+        'Retry-After': String(secondsUntilNextUtcMidnight()),
+        ...rateLimitHeaders(quota),
+      }
+    );
+  }
+
+  // ── Step 4: 用该租户的凭据跑 MCP ──────────────────────────────
   try {
     const gscClient = createGscClient(identity.googleRefreshToken);
     const server = createMcpServer({ gscClient });
@@ -118,6 +149,17 @@ export async function POST(request: Request): Promise<Response> {
 
     // 记录活跃时间：失败不影响本次调用（内部已 catch）
     await markApiKeyUsed(identity.userId);
+
+    // 成功响应也带上配额余量，客户端可自行节流（SDK 返回的 Response 头可写）
+    if (quota) {
+      try {
+        for (const [name, value] of Object.entries(rateLimitHeaders(quota))) {
+          response.headers.set(name, value);
+        }
+      } catch (headerErr) {
+        console.warn('[mcp] Failed to attach rate-limit headers:', headerErr);
+      }
+    }
 
     return response;
   } catch (err) {
