@@ -6,11 +6,19 @@ import type { Session } from '@supabase/supabase-js';
 import InspectionResultCard from '@/app/components/InspectionResultCard';
 import OpportunityResults from '@/app/components/OpportunityResults';
 import ApiKeyCard from '@/app/components/ApiKeyCard';
+import McpConfigCard from '@/app/components/McpConfigCard';
+import Link from 'next/link';
 import type {
   ApiResponse,
   InspectionResult,
   RadarResult,
 } from '@/app/types/gsc';
+
+/**
+ * Google 未验证应用会在登录页弹出红色警告。提前解释，避免访客把它当成钓鱼而流失。
+ * 放在常量里，省得 JSX 中出现需要转义的英文双引号。
+ */
+const UNVERIFIED_APP_HINT = `Google may show a "hasn't verified this app" warning — that's expected for a free beta. Click Advanced → Go to gsc-mcp-core (unsafe).`;
 
 export default function Home() {
   const [siteUrl, setSiteUrl] = useState('https://glq-api.asia/');
@@ -148,7 +156,12 @@ export default function Home() {
             <h1 className="text-3xl font-bold tracking-tight">GSC Diagnostic Tool</h1>
             <p className="text-gray-400 mt-1">Next.js Micro-SaaS - GSC API Integration</p>
           </div>
-          <div className="mt-4 md:mt-0">
+          <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end gap-2">
+            {!authLoading && !session?.user?.email && (
+              <p className="text-xs text-gray-400 leading-relaxed max-w-sm md:text-right">
+                {UNVERIFIED_APP_HINT}
+              </p>
+            )}
             {authLoading ? (
               <span className="text-sm text-gray-400">Checking session...</span>
             ) : session?.user?.email ? (
@@ -181,6 +194,8 @@ export default function Home() {
         {!authLoading && session?.user?.email && (
           <ApiKeyCard email={session.user.email} />
         )}
+
+        <McpConfigCard />
 
         <div className="bg-[#1e293b] p-6 rounded-xl border border-gray-700 shadow-lg space-y-4">
           <div>
@@ -308,6 +323,16 @@ export default function Home() {
             Get the Pro SEO & Chargeback Guide ($9.99)
           </a>
         </p>
+
+        <nav className="flex items-center justify-center gap-4 text-gray-500 text-sm mt-4">
+          <Link href="/privacy" className="hover:text-gray-300 underline">
+            Privacy Policy
+          </Link>
+          <span aria-hidden="true">·</span>
+          <Link href="/terms" className="hover:text-gray-300 underline">
+            Terms of Service
+          </Link>
+        </nav>
       </div>
     </main>
   );

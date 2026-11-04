@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatDateTime } from '@/app/lib/format';
+import { copyText } from '@/app/lib/clipboard';
 
 /** 与 src/lib/api-keys.ts 的 API_KEY_PREFIX 一致，仅用于界面展示。 */
 const API_KEY_DISPLAY_PREFIX = 'gsc_live_';
@@ -34,33 +35,6 @@ interface GenerateResponse {
 }
 
 type CopyTarget = 'key' | 'config';
-
-/** 复制到剪贴板，返回是否成功（非 https 环境下 navigator.clipboard 不可用）。 */
-async function copyText(text: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch {
-    // 落回下面的兜底方案
-  }
-
-  try {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.setAttribute('readonly', '');
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.appendChild(textarea);
-    textarea.select();
-    const ok = document.execCommand('copy');
-    document.body.removeChild(textarea);
-    return ok;
-  } catch {
-    return false;
-  }
-}
 
 export default function ApiKeyCard({ email }: { email: string }) {
   const [issuing, setIssuing] = useState(false);
