@@ -3,8 +3,9 @@ import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'GSC Diagnostic Tool',
-  description: 'Next.js Micro-SaaS - GSC API Integration',
+  title: 'GSC MCP Core — Query Search Console from Cursor & Claude',
+  description:
+    'Find striking-distance keywords and index issues in natural language — no CSV exports.',
 };
 
 export default function RootLayout({
