@@ -153,8 +153,8 @@ export default function Home() {
         
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-700 pb-6">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">GSC Diagnostic Tool</h1>
-            <p className="text-gray-400 mt-1">Next.js Micro-SaaS - GSC API Integration</p>
+            <h1 className="text-3xl font-bold tracking-tight">GSC MCP Core</h1>
+            <p className="text-gray-400 mt-1">Query Google Search Console from Cursor & Claude</p>
           </div>
           <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end gap-2">
             {!authLoading && !session?.user?.email && (
