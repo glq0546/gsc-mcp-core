@@ -7,7 +7,7 @@
     "url": "https://github.com/glq0546/gsc-mcp-core",
     "source": "github"
   },
-  "version": "1.0.0",
+  "version": "1.0.1",
   "remotes": [
     {
       "type": "streamable-http",
