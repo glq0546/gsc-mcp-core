@@ -15,7 +15,7 @@ import { copyText } from '@/app/lib/clipboard';
 const API_KEY_DISPLAY_PREFIX = 'gsc_live_';
 
 /** 默认按线上部署地址生成配置；本地开发时自动指向当前 origin。 */
-const DEFAULT_MCP_URL = 'https://gsc-mcp-core.vercel.app/api/mcp';
+const DEFAULT_MCP_URL = 'https://mcp.glq-api.asia/api/mcp';
 
 interface IssuedKey {
   apiKey: string;

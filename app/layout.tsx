@@ -3,7 +3,7 @@ import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://gsc-mcp-core.vercel.app'),
+  metadataBase: new URL('https://mcp.glq-api.asia'),
   title: 'GSC MCP Core — Query Search Console from Cursor & Claude',
   description:
     'Find striking-distance keywords and index issues in natural language — no CSV exports.',
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     title: 'GSC MCP Core',
     description:
       'Query GSC data directly in Cursor & Claude — find striking-distance keywords and index issues without exporting a single CSV.',
-    url: 'https://gsc-mcp-core.vercel.app',
+    url: 'https://mcp.glq-api.asia',
     siteName: 'GSC MCP Core',
     type: 'website',
   },

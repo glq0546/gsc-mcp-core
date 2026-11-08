@@ -11,7 +11,7 @@
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://gsc-mcp-core.vercel.app/api/mcp"
+      "url": "https://mcp.glq-api.asia/api/mcp"
     }
   ]
 }

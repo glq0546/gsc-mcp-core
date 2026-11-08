@@ -12,7 +12,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { copyText } from '@/app/lib/clipboard';
 
 /** 与 ApiKeyCard 保持一致：线上写死部署地址，本地开发用当前 origin。 */
-const DEFAULT_MCP_URL = 'https://gsc-mcp-core.vercel.app/api/mcp';
+const DEFAULT_MCP_URL = 'https://mcp.glq-api.asia/api/mcp';
 
 const PLACEHOLDER_KEY = 'gsc_live_your_api_key_here';
 
