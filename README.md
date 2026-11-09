@@ -1,5 +1,7 @@
 # GSC MCP Core
 
+[![GSC MCP Core on Glama](https://glama.ai/mcp/connectors/io.github.glq0546/gsc-mcp-core/badges/score.svg)](https://glama.ai/mcp/connectors/io.github.glq0546/gsc-mcp-core)
+
 Query Google Search Console from Cursor or Claude. Find striking-distance keywords in natural language — no CSV exports.
 
 ## Features
