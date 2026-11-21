@@ -15,6 +15,11 @@ export const metadata: Metadata = {
     siteName: 'GSC MCP Core',
     type: 'website',
   },
+  verification: {
+    other: {
+      'msvalidate.01': '6E15ECF1C82795CF510E9F0B01DF46F6',
+    },
+  },
 };
 
 export default function RootLayout({
